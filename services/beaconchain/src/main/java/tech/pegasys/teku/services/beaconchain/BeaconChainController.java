@@ -138,7 +138,7 @@ import tech.pegasys.teku.storage.api.VoteUpdateChannel;
 import tech.pegasys.teku.storage.client.CombinedChainDataClient;
 import tech.pegasys.teku.storage.client.RecentChainData;
 import tech.pegasys.teku.storage.client.StorageBackedRecentChainData;
-import tech.pegasys.teku.storage.store.FileKeyValueStore;
+import tech.pegasys.teku.storage.store.FileKeyValueStoreFactory;
 import tech.pegasys.teku.storage.store.KeyValueStore;
 import tech.pegasys.teku.storage.store.StoreConfig;
 import tech.pegasys.teku.validator.api.InteropConfig;
@@ -218,7 +218,7 @@ public class BeaconChainController extends Service implements BeaconChainControl
   protected volatile Optional<MergeTransitionConfigCheck> mergeTransitionConfigCheck =
       Optional.empty();
   protected volatile ProposersDataManager proposersDataManager;
-  protected volatile KeyValueStore<String, Bytes> keyValueStore;
+  protected static volatile KeyValueStore<String, Bytes> keyValueStore;
 
   protected UInt64 genesisTimeTracker = ZERO;
   protected BlockManager blockManager;
@@ -400,7 +400,7 @@ public class BeaconChainController extends Service implements BeaconChainControl
 
   private void initKeyValueStore() {
     keyValueStore =
-        new FileKeyValueStore(beaconDataDirectory.resolve(KEY_VALUE_STORE_SUBDIRECTORY));
+            FileKeyValueStoreFactory.createStore(beaconDataDirectory.resolve(KEY_VALUE_STORE_SUBDIRECTORY));
   }
 
   protected void initExecutionLayer() {
@@ -1199,5 +1199,9 @@ public class BeaconChainController extends Service implements BeaconChainControl
   @Override
   public ForkChoice getForkChoice() {
     return forkChoice;
+  }
+
+  public static KeyValueStore<String, Bytes> getKeyValueStore() {
+    return keyValueStore;
   }
 }

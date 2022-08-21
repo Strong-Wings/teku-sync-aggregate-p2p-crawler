@@ -13,10 +13,7 @@
 
 package tech.pegasys.teku.networking.eth2.gossip.topics.topichandlers;
 
-import static tech.pegasys.teku.infrastructure.logging.P2PLogger.P2P_LOG;
-
 import io.libp2p.core.pubsub.ValidationResult;
-import java.util.concurrent.RejectedExecutionException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.tuweni.bytes.Bytes;
@@ -39,6 +36,10 @@ import tech.pegasys.teku.service.serviceutils.ServiceCapacityExceededException;
 import tech.pegasys.teku.statetransition.validation.InternalValidationResult;
 import tech.pegasys.teku.storage.client.RecentChainData;
 
+import java.util.concurrent.RejectedExecutionException;
+
+import static tech.pegasys.teku.infrastructure.logging.P2PLogger.P2P_LOG;
+
 public class Eth2TopicHandler<MessageT extends SszData> implements TopicHandler {
   private static final Logger LOG = LogManager.getLogger();
   private final AsyncRunner asyncRunner;
@@ -49,6 +50,7 @@ public class Eth2TopicHandler<MessageT extends SszData> implements TopicHandler 
   private final SszSchema<MessageT> messageType;
   private final Eth2PreparedGossipMessageFactory preparedGossipMessageFactory;
   private final int maxMessageSize;
+  private final SyncAggregateCrawler<MessageT> syncAggregateCrawler;
 
   public Eth2TopicHandler(
       final RecentChainData recentChainData,
@@ -69,6 +71,7 @@ public class Eth2TopicHandler<MessageT extends SszData> implements TopicHandler 
     this.preparedGossipMessageFactory =
         gossipEncoding.createPreparedGossipMessageFactory(
             recentChainData::getMilestoneByForkDigest);
+    this.syncAggregateCrawler = new SyncAggregateCrawler<MessageT>();
   }
 
   public Eth2TopicHandler(
@@ -103,8 +106,12 @@ public class Eth2TopicHandler<MessageT extends SszData> implements TopicHandler 
                             .thenApply(
                                 internalValidation -> {
                                   processMessage(internalValidation, message);
-                                  return GossipSubValidationUtil.fromInternalValidationResult(
+                                  var validationResult=  GossipSubValidationUtil.fromInternalValidationResult(
                                       internalValidation);
+                                  if (validationResult == ValidationResult.Valid) {
+                                    syncAggregateCrawler.saveMessage(deserialized);
+                                  }
+                                  return validationResult;
                                 })))
         .exceptionally(error -> handleMessageProcessingError(message, error));
   }

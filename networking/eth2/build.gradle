@@ -21,6 +21,7 @@ dependencies {
   implementation 'org.apache.tuweni:tuweni-bytes'
   implementation 'org.apache.tuweni:tuweni-ssz'
   implementation 'org.xerial.snappy:snappy-java'
+  implementation 'com.fasterxml.jackson.core:jackson-databind'
 
   testImplementation testFixtures(project(':infrastructure:metrics'))
   testImplementation testFixtures(project(':ethereum:spec'))
