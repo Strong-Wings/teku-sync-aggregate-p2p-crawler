@@ -8,7 +8,7 @@ public class FileKeyValueStoreFactory {
 
     private static volatile KeyValueStore<String, Bytes> keyValueStore;
 
-    public static KeyValueStore<String, Bytes>  createStore(Path path) {
+    public static KeyValueStore<String, Bytes> createStore(Path path) {
         keyValueStore = new FileKeyValueStore(path);
         return keyValueStore;
     }

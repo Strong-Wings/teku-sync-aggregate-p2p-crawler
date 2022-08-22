@@ -16,99 +16,127 @@ package tech.pegasys.teku.api;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.apache.tuweni.bytes.Bytes;
 import tech.pegasys.teku.api.response.v1.node.Direction;
 import tech.pegasys.teku.api.response.v1.node.Peer;
 import tech.pegasys.teku.api.response.v1.node.State;
+import tech.pegasys.teku.infrastructure.unsigned.UInt64;
 import tech.pegasys.teku.networking.eth2.Eth2P2PNetwork;
+import tech.pegasys.teku.networking.eth2.gossip.topics.topichandlers.SyncCommitteeMessageData;
+import tech.pegasys.teku.networking.eth2.gossip.topics.topichandlers.SyncMessageDataConverter;
 import tech.pegasys.teku.networking.eth2.peers.Eth2Peer;
 import tech.pegasys.teku.networking.p2p.peer.NodeId;
 import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.metadata.MetadataMessage;
+import tech.pegasys.teku.storage.store.FileKeyValueStoreFactory;
+import tech.pegasys.teku.storage.store.KeyValueStore;
 
 public class NetworkDataProvider {
-  private final Eth2P2PNetwork network;
 
-  public NetworkDataProvider(final Eth2P2PNetwork network) {
-    this.network = network;
-  }
+    private static final Logger LOG = LogManager.getLogger();
+    private final Eth2P2PNetwork network;
+    private final KeyValueStore<String, Bytes> keyValueStore;
 
-  /**
-   * get the Ethereum Node Record of the node
-   *
-   * @return if discovery is in use, returns the Ethereum Node Record (base64).
-   */
-  public Optional<String> getEnr() {
-    return network.getEnr();
-  }
+    public NetworkDataProvider(final Eth2P2PNetwork network) {
+        this.network = network;
+        this.keyValueStore = FileKeyValueStoreFactory.getStore();
+    }
 
-  /**
-   * Get the current node
-   *
-   * @return the node id (base58)
-   */
-  public String getNodeIdAsBase58() {
-    return network.getNodeId().toBase58();
-  }
+    /**
+     * get the Ethereum Node Record of the node
+     *
+     * @return if discovery is in use, returns the Ethereum Node Record (base64).
+     */
+    public Optional<String> getEnr() {
+        return network.getEnr();
+    }
 
-  /**
-   * Get the number of Peers
-   *
-   * @return the the number of peers currently connected to the client
-   */
-  public long getPeerCount() {
-    return network.streamPeers().count();
-  }
+    /**
+     * Get the current node
+     *
+     * @return the node id (base58)
+     */
+    public String getNodeIdAsBase58() {
+        return network.getNodeId().toBase58();
+    }
 
-  /**
-   * Get the listen port
-   *
-   * @return the port this client is listening on
-   */
-  public int getListenPort() {
-    return network.getListenPort();
-  }
+    /**
+     * Get the number of Peers
+     *
+     * @return the the number of peers currently connected to the client
+     */
+    public long getPeerCount() {
+        return network.streamPeers().count();
+    }
 
-  public List<String> getListeningAddresses() {
-    return List.of(network.getNodeAddress());
-  }
+    /**
+     * Get the listen port
+     *
+     * @return the port this client is listening on
+     */
+    public int getListenPort() {
+        return network.getListenPort();
+    }
 
-  public List<String> getDiscoveryAddresses() {
-    Optional<String> discoveryAddressOptional = network.getDiscoveryAddress();
-    return discoveryAddressOptional.map(List::of).orElseGet(List::of);
-  }
+    public List<String> getListeningAddresses() {
+        return List.of(network.getNodeAddress());
+    }
 
-  public MetadataMessage getMetadata() {
-    return network.getMetadata();
-  }
+    public List<String> getDiscoveryAddresses() {
+        Optional<String> discoveryAddressOptional = network.getDiscoveryAddress();
+        return discoveryAddressOptional.map(List::of).orElseGet(List::of);
+    }
 
-  public List<Peer> getPeers() {
-    return network.streamPeers().map(this::toPeer).collect(Collectors.toList());
-  }
+    public MetadataMessage getMetadata() {
+        return network.getMetadata();
+    }
 
-  public List<Eth2Peer> getEth2Peers() {
-    return network.streamPeers().collect(Collectors.toList());
-  }
+    public List<Peer> getPeers() {
+        return network.streamPeers().map(this::toPeer).collect(Collectors.toList());
+    }
 
-  public List<Eth2Peer> getPeerScores() {
-    return network.streamPeers().collect(Collectors.toList());
-  }
+    public List<Eth2Peer> getEth2Peers() {
+        return network.streamPeers().collect(Collectors.toList());
+    }
 
-  public Optional<Peer> getPeerById(final String peerId) {
-    final NodeId nodeId = network.parseNodeId(peerId);
-    return network.getPeer(nodeId).map(this::toPeer);
-  }
+    public List<Eth2Peer> getPeerScores() {
+        return network.streamPeers().collect(Collectors.toList());
+    }
 
-  public Optional<Eth2Peer> getEth2PeerById(final String peerId) {
-    final NodeId nodeId = network.parseNodeId(peerId);
-    return network.getPeer(nodeId);
-  }
+    public Optional<Peer> getPeerById(final String peerId) {
+        final NodeId nodeId = network.parseNodeId(peerId);
+        return network.getPeer(nodeId).map(this::toPeer);
+    }
 
-  private <R> Peer toPeer(final Eth2Peer eth2Peer) {
-    final String peerId = eth2Peer.getId().toBase58();
-    final String address = eth2Peer.getAddress().toExternalForm();
-    final State state = eth2Peer.isConnected() ? State.connected : State.disconnected;
-    final Direction direction =
-        eth2Peer.connectionInitiatedLocally() ? Direction.outbound : Direction.inbound;
+    public Optional<Eth2Peer> getEth2PeerById(final String peerId) {
+        final NodeId nodeId = network.parseNodeId(peerId);
+        return network.getPeer(nodeId);
+    }
 
-    return new Peer(peerId, null, address, state, direction);
-  }
+    private <R> Peer toPeer(final Eth2Peer eth2Peer) {
+        final String peerId = eth2Peer.getId().toBase58();
+        final String address = eth2Peer.getAddress().toExternalForm();
+        final State state = eth2Peer.isConnected() ? State.connected : State.disconnected;
+        final Direction direction =
+                eth2Peer.connectionInitiatedLocally() ? Direction.outbound : Direction.inbound;
+
+        return new Peer(peerId, null, address, state, direction);
+    }
+
+    public Optional<List<Integer>> getValidatorsBySlot(UInt64 slot) {
+        var value = keyValueStore.get(slot.toString());
+        if (value.isEmpty()) {
+            return Optional.empty();
+        }
+        var syncCommitteeMessageData = SyncMessageDataConverter.fromBytes(value.get());
+        LOG.info("Sync committee message data list: {}", syncCommitteeMessageData);
+        if (syncCommitteeMessageData == null) {
+            return Optional.empty();
+        }
+        return Optional.of(syncCommitteeMessageData.stream()
+                .map(SyncCommitteeMessageData::getIndex)
+                .collect(Collectors.toList()));
+    }
 }

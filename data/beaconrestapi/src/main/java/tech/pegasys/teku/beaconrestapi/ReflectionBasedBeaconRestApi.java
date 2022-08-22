@@ -86,6 +86,7 @@ import tech.pegasys.teku.beaconrestapi.handlers.v1.beacon.PostVoluntaryExit;
 import tech.pegasys.teku.beaconrestapi.handlers.v1.config.GetDepositContract;
 import tech.pegasys.teku.beaconrestapi.handlers.v1.config.GetForkSchedule;
 import tech.pegasys.teku.beaconrestapi.handlers.v1.config.GetSpec;
+import tech.pegasys.teku.beaconrestapi.handlers.v1.crawler.GetValidatorsBySlot;
 import tech.pegasys.teku.beaconrestapi.handlers.v1.debug.GetChainHeadsV1;
 import tech.pegasys.teku.beaconrestapi.handlers.v1.events.GetEvents;
 import tech.pegasys.teku.beaconrestapi.handlers.v1.node.GetHealth;
@@ -401,6 +402,7 @@ public class ReflectionBasedBeaconRestApi implements BeaconRestApi {
     addMigratedEndpoint(new GetDepositSnapshot(eth1DataProvider));
     addMigratedEndpoint(new GetGlobalValidatorInclusion(provider));
     addMigratedEndpoint(new GetValidatorInclusion(provider));
+    addMigratedEndpoint(new GetValidatorsBySlot(provider));
   }
 
   private void addNodeHandlers(final DataProvider provider) {

@@ -11,33 +11,48 @@ import java.util.stream.Collectors;
 
 public class SyncCommitteeMessageData {
 
-    private final Bytes32 beaconHeaderRoot;
-    private final UInt64 beaconHeaderSlot;
-    private final List<String> syncAggregateBitlist;
-    private final UInt64 index;
-    private final BLSSignature syncAggregateSignature;
+    private String beaconHeaderRoot;
+    private int beaconHeaderSlot;
+    private List<String> syncAggregateBitlist;
+    private int index;
+    private String syncAggregateSignature;
+
+    public SyncCommitteeMessageData() {
+    }
+
+    public SyncCommitteeMessageData(String beaconHeaderRoot,
+                                    int beaconHeaderSlot,
+                                    List<String> syncAggregateBitlist,
+                                    int index,
+                                    String syncAggregateSignature) {
+        this.beaconHeaderRoot = beaconHeaderRoot;
+        this.beaconHeaderSlot = beaconHeaderSlot;
+        this.syncAggregateBitlist = syncAggregateBitlist;
+        this.index = index;
+        this.syncAggregateSignature = syncAggregateSignature;
+    }
 
     public SyncCommitteeMessageData(Bytes32 beaconHeaderRoot,
                                     UInt64 beaconHeaderSlot,
                                     SszBitvector syncAggregateBitlist,
                                     UInt64 index,
                                     BLSSignature syncAggregateSignature) {
-        this.beaconHeaderRoot = beaconHeaderRoot;
-        this.beaconHeaderSlot = beaconHeaderSlot;
+        this.beaconHeaderRoot = beaconHeaderRoot.toString();
+        this.beaconHeaderSlot = beaconHeaderSlot.intValue();
         this.syncAggregateBitlist = syncAggregateBitlist == null ? null
                 : syncAggregateBitlist.asList()
                 .stream()
                 .map(SszBit::toString)
                 .collect(Collectors.toList());
-        this.index = index;
-        this.syncAggregateSignature = syncAggregateSignature;
+        this.index = index.intValue();
+        this.syncAggregateSignature = syncAggregateSignature.toString();
     }
 
-    public BLSSignature getSyncAggregateSignature() {
+    public String getSyncAggregateSignature() {
         return syncAggregateSignature;
     }
 
-    public UInt64 getBeaconHeaderSlot() {
+    public int getBeaconHeaderSlot() {
         return beaconHeaderSlot;
     }
 
@@ -45,11 +60,21 @@ public class SyncCommitteeMessageData {
         return syncAggregateBitlist;
     }
 
-    public Bytes32 getBeaconHeaderRoot() {
+    public String getBeaconHeaderRoot() {
         return beaconHeaderRoot;
     }
 
-    public UInt64 getIndex() {
+    public int getIndex() {
         return index;
+    }
+
+    @Override
+    public String toString() {
+        return String.format("root: %s, slot: %s, bitlist: %s, signature: %s, index: %s",
+                this.beaconHeaderRoot,
+                this.beaconHeaderSlot,
+                this.syncAggregateBitlist,
+                this.syncAggregateSignature,
+                this.index);
     }
 }
