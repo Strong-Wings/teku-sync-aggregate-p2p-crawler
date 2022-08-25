@@ -13,16 +13,21 @@
 
 package tech.pegasys.teku.api;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.tuweni.bytes.Bytes;
+import tech.pegasys.teku.api.response.v1.crawler.ValidatorsData;
 import tech.pegasys.teku.api.response.v1.node.Direction;
 import tech.pegasys.teku.api.response.v1.node.Peer;
 import tech.pegasys.teku.api.response.v1.node.State;
+import tech.pegasys.teku.bls.BLS;
+import tech.pegasys.teku.bls.BLSSignature;
 import tech.pegasys.teku.infrastructure.unsigned.UInt64;
 import tech.pegasys.teku.networking.eth2.Eth2P2PNetwork;
 import tech.pegasys.teku.networking.eth2.gossip.topics.topichandlers.SyncCommitteeMessageData;
@@ -125,7 +130,7 @@ public class NetworkDataProvider {
         return new Peer(peerId, null, address, state, direction);
     }
 
-    public Optional<List<Integer>> getValidatorsBySlot(UInt64 slot) {
+    public Optional<ValidatorsData> getValidatorsBySlot(UInt64 slot) {
         var value = keyValueStore.get(slot.toString());
         if (value.isEmpty()) {
             return Optional.empty();
@@ -135,8 +140,43 @@ public class NetworkDataProvider {
         if (syncCommitteeMessageData == null) {
             return Optional.empty();
         }
-        return Optional.of(syncCommitteeMessageData.stream()
+
+        var beaconRoot = syncCommitteeMessageData.stream()
+                .findFirst().
+                map(SyncCommitteeMessageData::getBeaconHeaderRoot)
+                .orElse(null);
+
+        // todo select without intersections
+        var signature = BLS.aggregate(
+                syncCommitteeMessageData.stream()
+                        .map(SyncCommitteeMessageData::getSyncAggregateSignature)
+                        .map(s -> BLSSignature.fromBytesCompressed(Bytes.fromHexString(s)))
+                        .collect(Collectors.toList())
+        ).toString();
+        List<String> bitList = new ArrayList<>();
+        syncCommitteeMessageData.stream()
+                .map(SyncCommitteeMessageData::getSyncAggregateBitlist)
+                .filter(Objects::nonNull)
+                .forEach(bl -> {
+                    if (bitList.isEmpty()) {
+                        bitList.addAll(bl);
+                    }
+                    for (int i = 0; i < bl.size(); i++) {
+                        if (Objects.equals(bl.get(i), "1")) {
+                            bitList.set(i, "1");
+                        }
+                    }
+                });
+        var validatorsIndicies = syncCommitteeMessageData.stream()
                 .map(SyncCommitteeMessageData::getIndex)
-                .collect(Collectors.toList()));
+                .collect(Collectors.toList());
+        var count = validatorsIndicies.size();
+
+        return Optional.of(new ValidatorsData(slot.intValue(),
+                beaconRoot,
+                signature,
+                bitList,
+                validatorsIndicies,
+                count));
     }
 }

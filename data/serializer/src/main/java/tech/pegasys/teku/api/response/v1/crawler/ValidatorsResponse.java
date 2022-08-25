@@ -14,18 +14,16 @@
 package tech.pegasys.teku.api.response.v1.crawler;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import java.util.List;
 import java.util.Objects;
 
 public class ValidatorsResponse {
   @JsonProperty("data")
-  public final List<Integer> data;
+  public final ValidatorsData data;
 
   @JsonCreator
-  public ValidatorsResponse(@JsonProperty("data") final List<Integer> data) {
+  public ValidatorsResponse(@JsonProperty("data") final ValidatorsData data) {
     this.data = data;
   }
 

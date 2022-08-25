@@ -13,6 +13,8 @@
 
 package tech.pegasys.teku.beaconrestapi.handlers.v1.crawler;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import io.javalin.core.util.Header;
 import io.javalin.http.Context;
@@ -25,6 +27,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import tech.pegasys.teku.api.DataProvider;
 import tech.pegasys.teku.api.NetworkDataProvider;
+import tech.pegasys.teku.api.response.v1.crawler.ValidatorsData;
 import tech.pegasys.teku.api.response.v1.crawler.ValidatorsResponse;
 import tech.pegasys.teku.beaconrestapi.MigratingEndpointAdapter;
 import tech.pegasys.teku.infrastructure.json.types.SerializableTypeDefinition;
@@ -44,7 +47,8 @@ import static tech.pegasys.teku.infrastructure.http.RestApiConstants.RES_OK;
 import static tech.pegasys.teku.infrastructure.http.RestApiConstants.SLOT;
 import static tech.pegasys.teku.infrastructure.http.RestApiConstants.SLOT_PATH_DESCRIPTION;
 import static tech.pegasys.teku.infrastructure.http.RestApiConstants.TAG_NODE;
-import static tech.pegasys.teku.infrastructure.json.types.CoreTypes.RAW_INTEGER_TYPE;
+import static tech.pegasys.teku.infrastructure.json.types.CoreTypes.INTEGER_TYPE;
+import static tech.pegasys.teku.infrastructure.json.types.CoreTypes.STRING_TYPE;
 import static tech.pegasys.teku.infrastructure.json.types.SerializableTypeDefinition.listOf;
 
 public class GetValidatorsBySlot extends MigratingEndpointAdapter {
@@ -98,22 +102,32 @@ public class GetValidatorsBySlot extends MigratingEndpointAdapter {
     if (validatorsBySlot.isEmpty()) {
       request.respondError(SC_NOT_FOUND, "Slot not found");
     } else {
-      LOG.info("Return validators {} indexes", validatorsBySlot.get().size());
-      request.respondOk(new ValidatorsData(validatorsBySlot.get()));
+      LOG.info("Return validators {} indexes", validatorsBySlot.get().validatorsIndicies.size());
+      request.respondOk(new ValidatorsWithData(validatorsBySlot.get()));
     }
   }
 
-  private static final SerializableTypeDefinition<ValidatorsData> VALIDATORS_RESPONSE_TYPE =
+  private static final SerializableTypeDefinition<ValidatorsData> VALIDATORS_DATA_TYPE =
           SerializableTypeDefinition.<ValidatorsData>object()
-                  .name("ValidatorsResponse")
-                  .withField("data", listOf(RAW_INTEGER_TYPE), ValidatorsData::getData)
+                  .name("ValidatorsData")
+                  .withField("slot", INTEGER_TYPE, v -> v.slot)
+                  .withField("beacon_root", STRING_TYPE, v -> v.beaconRoot)
+                  .withField("signature", STRING_TYPE, v -> v.signature)
+                  .withField("bitlist", listOf(STRING_TYPE), v -> v.bitlist)
+                  .withField("validators_indicies", listOf(INTEGER_TYPE), v -> v.validatorsIndicies)
+                  .withField("count", INTEGER_TYPE, v -> v.count)
                   .build();
 
+  private static final SerializableTypeDefinition<ValidatorsWithData> VALIDATORS_RESPONSE_TYPE =
+          SerializableTypeDefinition.<ValidatorsWithData>object()
+                  .name("ValidatorsResponse")
+                  .withField("data", VALIDATORS_DATA_TYPE, ValidatorsWithData::getData)
+                  .build();
 
-  private static class ValidatorsData {
-    public final List<Integer> data;
+  private static class ValidatorsWithData {
+    public final ValidatorsData data;
 
-    public ValidatorsData(final List<Integer> data) {
+    public ValidatorsWithData(final ValidatorsData data) {
       this.data = data;
     }
 
@@ -125,11 +139,11 @@ public class GetValidatorsBySlot extends MigratingEndpointAdapter {
       if (o == null || getClass() != o.getClass()) {
         return false;
       }
-      final ValidatorsData that = (ValidatorsData) o;
+      final ValidatorsWithData that = (ValidatorsWithData) o;
       return Objects.equals(this.data, that.data);
     }
 
-    public List<Integer> getData() {
+    public ValidatorsData getData() {
       return this.data;
     }
 
