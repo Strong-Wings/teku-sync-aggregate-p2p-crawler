@@ -14,9 +14,11 @@
 package tech.pegasys.teku.api;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.apache.logging.log4j.LogManager;
@@ -146,37 +148,119 @@ public class NetworkDataProvider {
                 map(SyncCommitteeMessageData::getBeaconHeaderRoot)
                 .orElse(null);
 
-        // todo select without intersections
+        syncCommitteeMessageData = syncCommitteeMessageData.stream()
+                .filter(s -> s.getSyncAggregateBitlist() != null)
+                .collect(Collectors.toList());
+        var selectedSyncCommitteeData = selectBitlistsWithoutIntersections(syncCommitteeMessageData);
         var signature = BLS.aggregate(
-                syncCommitteeMessageData.stream()
+                selectedSyncCommitteeData.stream()
                         .map(SyncCommitteeMessageData::getSyncAggregateSignature)
                         .map(s -> BLSSignature.fromBytesCompressed(Bytes.fromHexString(s)))
                         .collect(Collectors.toList())
         ).toString();
-        List<String> bitList = new ArrayList<>();
-        syncCommitteeMessageData.stream()
+        List<Integer> finalBitList = new ArrayList<>();
+        selectedSyncCommitteeData.stream()
                 .map(SyncCommitteeMessageData::getSyncAggregateBitlist)
                 .filter(Objects::nonNull)
                 .forEach(bl -> {
-                    if (bitList.isEmpty()) {
-                        bitList.addAll(bl);
+                    if (finalBitList.isEmpty()) {
+                        finalBitList.addAll(bl);
                     }
                     for (int i = 0; i < bl.size(); i++) {
-                        if (Objects.equals(bl.get(i), "1")) {
-                            bitList.set(i, "1");
+                        if (bl.get(i) == 1) {
+                            finalBitList.set(i, 1);
                         }
                     }
                 });
         var validatorsIndicies = syncCommitteeMessageData.stream()
                 .map(SyncCommitteeMessageData::getIndex)
                 .collect(Collectors.toList());
-        var count = validatorsIndicies.size();
+        var count = (int) finalBitList.stream().filter(b -> b == 1).count();
 
         return Optional.of(new ValidatorsData(slot.intValue(),
                 beaconRoot,
                 signature,
-                bitList,
+                finalBitList,
                 validatorsIndicies,
                 count));
+    }
+
+    private static List<SyncCommitteeMessageData> selectBitlistsWithoutIntersections
+            (List<SyncCommitteeMessageData> syncCommitteeMessageDataList) {
+        var bitsSize = syncCommitteeMessageDataList.get(0).getSyncAggregateBitlist().size();
+
+        List<Integer> bitsByIndexCount = new ArrayList<>();
+        List<Set<Integer>> bitlistsForBit = new ArrayList<>();;
+        for (var bitIndex = 0; bitIndex < bitsSize; bitIndex++) {
+            int c = 0;
+            Set<Integer> set = new HashSet<>();
+            for (var bitlistNumber = 0; bitlistNumber < syncCommitteeMessageDataList.size(); bitlistNumber++) {
+                var bitlist = syncCommitteeMessageDataList.get(bitlistNumber).getSyncAggregateBitlist();
+                c += bitlist.get(bitIndex);
+                if (bitlist.get(bitIndex) == 1) {
+                    set.add(bitlistNumber);
+                }
+            }
+            bitsByIndexCount.add(c);
+            bitlistsForBit.add(set);
+        }
+
+        List<Integer> bitsCount = new ArrayList<>();
+        List<Integer> uniqueBitsCount = new ArrayList<>();
+        for (var syncCommitteeMessageData : syncCommitteeMessageDataList) {
+            var bitList = syncCommitteeMessageData.getSyncAggregateBitlist();
+            var c1 = 0;
+            var c2 = 0;
+            for (var bitIndex = 0; bitIndex < bitsSize; bitIndex++) {
+                if (bitList.get(bitIndex) == 1) {
+                    c1 += 1;
+                    if (bitsByIndexCount.get(bitIndex) == 1) {
+                        c2 += 1;
+                    }
+                }
+            }
+            bitsCount.add(c1);
+            uniqueBitsCount.add(c2);
+        }
+
+        List<Boolean> removedBitlists = syncCommitteeMessageDataList.stream()
+                .map(SyncCommitteeMessageData::getSyncAggregateBitlist)
+                .map(b -> false)
+                .collect(Collectors.toList());
+        for (var bitIndex = 0; bitIndex < bitsSize; bitIndex++) {
+            Set<Integer> activeBitlistsNumbers = new HashSet<>();
+            for (var bitlistNumber : bitlistsForBit.get(bitIndex)) {
+                if (!removedBitlists.get(bitlistNumber)) {
+                    activeBitlistsNumbers.add(bitlistNumber);
+                }
+            }
+            int leftOne = -1;
+            int maxUniqueBits = -1;
+            int maxBits = -1;
+            for (var activeBitlistNumber : activeBitlistsNumbers) {
+                if (uniqueBitsCount.get(activeBitlistNumber) > maxUniqueBits
+                        || (uniqueBitsCount.get(activeBitlistNumber) == maxUniqueBits && bitsCount.get(activeBitlistNumber) == maxBits)) {
+                    leftOne = activeBitlistNumber;
+                }
+            }
+            for (var activeBitlistNumber : activeBitlistsNumbers) {
+                if (activeBitlistNumber != leftOne) {
+                    removedBitlists.set(activeBitlistNumber, true);
+                }
+            }
+        }
+
+        Set<Integer> selectedBitlistsNumbers = new HashSet<>();
+        for (var bitlistNumber = 0; bitlistNumber < removedBitlists.size(); bitlistNumber++) {
+            if (!removedBitlists.get(bitlistNumber)) {
+                selectedBitlistsNumbers.add(bitlistNumber);
+            }
+        }
+
+        List<SyncCommitteeMessageData> selectedSyncCommitteeMessageDataList = new ArrayList<>();
+        for (var selectedBitlistNumber : selectedBitlistsNumbers) {
+            selectedSyncCommitteeMessageDataList.add(syncCommitteeMessageDataList.get(selectedBitlistNumber));
+        }
+        return selectedSyncCommitteeMessageDataList;
     }
 }

@@ -17,7 +17,7 @@ public class ValidatorsData {
     public final String signature;
 
     @JsonProperty("bitlist")
-    public final List<String> bitlist;
+    public final List<Integer> bitlist;
 
     @JsonProperty("validators_indicies")
     public final List<Integer> validatorsIndicies;
@@ -29,7 +29,7 @@ public class ValidatorsData {
     public ValidatorsData(@JsonProperty("slot") final int slot,
                           @JsonProperty("beacon_root") final String beaconRoot,
                           @JsonProperty("signature") final String signature,
-                          @JsonProperty("bitlist") final List<String> bitlist,
+                          @JsonProperty("bitlist") final List<Integer> bitlist,
                           @JsonProperty("validators_indicies") final List<Integer> validatorsIndicies,
                           @JsonProperty("count") final int count) {
         this.slot = slot;

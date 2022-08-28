@@ -13,8 +13,6 @@
 
 package tech.pegasys.teku.beaconrestapi.handlers.v1.crawler;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import io.javalin.core.util.Header;
 import io.javalin.http.Context;
@@ -34,7 +32,6 @@ import tech.pegasys.teku.infrastructure.json.types.SerializableTypeDefinition;
 import tech.pegasys.teku.infrastructure.restapi.endpoints.EndpointMetadata;
 import tech.pegasys.teku.infrastructure.restapi.endpoints.RestApiRequest;
 
-import java.util.List;
 import java.util.Objects;
 
 import static javax.servlet.http.HttpServletResponse.SC_NOT_FOUND;
@@ -113,7 +110,7 @@ public class GetValidatorsBySlot extends MigratingEndpointAdapter {
                   .withField("slot", INTEGER_TYPE, v -> v.slot)
                   .withField("beacon_root", STRING_TYPE, v -> v.beaconRoot)
                   .withField("signature", STRING_TYPE, v -> v.signature)
-                  .withField("bitlist", listOf(STRING_TYPE), v -> v.bitlist)
+                  .withField("bitlist", listOf(INTEGER_TYPE), v -> v.bitlist)
                   .withField("validators_indicies", listOf(INTEGER_TYPE), v -> v.validatorsIndicies)
                   .withField("count", INTEGER_TYPE, v -> v.count)
                   .build();

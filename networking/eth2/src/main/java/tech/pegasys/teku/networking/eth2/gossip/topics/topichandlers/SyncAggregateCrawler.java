@@ -37,7 +37,8 @@ public class SyncAggregateCrawler<MessageT extends SszData> {
             var aggregationBits = message.getContribution().getAggregationBits();
             var index = signedContributionAndProof.getMessage().getAggregatorIndex();
             var signature = signedContributionAndProof.getSignature();
-            saveSyncData(slot, beaconRoot, aggregationBits, index, signature);
+            var subIndex = message.getContribution().getSubcommitteeIndex();
+            saveSyncData(slot, beaconRoot, aggregationBits, index, signature, subIndex);
         } else if (messageT instanceof SyncCommitteeMessage) {
             var syncCommitteeMessage = (SyncCommitteeMessage) messageT;
             LOG.info("SyncCommitteeMessage: {}", syncCommitteeMessage);
@@ -46,12 +47,12 @@ public class SyncAggregateCrawler<MessageT extends SszData> {
             var beaconRoot = syncCommitteeMessage.getBeaconBlockRoot();
             var index = syncCommitteeMessage.getValidatorIndex();
             var signature = syncCommitteeMessage.getSignature();
-            saveSyncData(slot, beaconRoot,null, index, signature);
+            saveSyncData(slot, beaconRoot,null, index, signature, null);
         }
     }
 
-    private void saveSyncData(UInt64 slot, Bytes32 beaconRoot, SszBitvector aggregationBits, UInt64 index, BLSSignature signature) {
-        var syncCommitteeMessageData = new SyncCommitteeMessageData(beaconRoot, slot, aggregationBits, index, signature);
+    private void saveSyncData(UInt64 slot, Bytes32 beaconRoot, SszBitvector aggregationBits, UInt64 index, BLSSignature signature, UInt64 subIndex) {
+        var syncCommitteeMessageData = new SyncCommitteeMessageData(beaconRoot, slot, aggregationBits, index, signature, subIndex);
         try {
             addNewValue(slot, syncCommitteeMessageData);
             LOG.info("Successfully saved {} in db", syncCommitteeMessageData);
