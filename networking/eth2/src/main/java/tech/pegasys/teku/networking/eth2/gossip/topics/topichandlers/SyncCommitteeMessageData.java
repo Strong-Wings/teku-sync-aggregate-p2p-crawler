@@ -83,6 +83,10 @@ public class SyncCommitteeMessageData {
         return index;
     }
 
+    public Integer getSubIndex() {
+        return subIndex;
+    }
+
     @Override
     public String toString() {
         return String.format("root: %s, slot: %s, bitlist: %s, signature: %s, index: %s, subIndex: %s",

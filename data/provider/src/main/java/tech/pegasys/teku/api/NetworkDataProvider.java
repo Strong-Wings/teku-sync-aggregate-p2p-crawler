@@ -24,6 +24,8 @@ import java.util.stream.Collectors;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.tuweni.bytes.Bytes;
+import tech.pegasys.teku.api.migrated.StateValidatorData;
+import tech.pegasys.teku.api.response.v1.crawler.SyncMessageData;
 import tech.pegasys.teku.api.response.v1.crawler.ValidatorsData;
 import tech.pegasys.teku.api.response.v1.node.Direction;
 import tech.pegasys.teku.api.response.v1.node.Peer;
@@ -132,7 +134,27 @@ public class NetworkDataProvider {
         return new Peer(peerId, null, address, state, direction);
     }
 
-    public Optional<ValidatorsData> getValidatorsBySlot(UInt64 slot) {
+    public Optional<List<SyncMessageData>> getSyncMessagesBySlot(UInt64 slot) {
+        var value = keyValueStore.get(slot.toString());
+        if (value.isEmpty()) {
+            return Optional.empty();
+        }
+        var syncCommitteeMessageData = SyncMessageDataConverter.fromBytes(value.get());
+        LOG.info("Sync committee message data list: {}", syncCommitteeMessageData);
+        if (syncCommitteeMessageData == null) {
+            return Optional.empty();
+        }
+        return Optional.of(syncCommitteeMessageData.stream()
+                .map(d -> new SyncMessageData(d.getBeaconHeaderSlot(),
+                        d.getBeaconHeaderRoot(),
+                        d.getSyncAggregateSignature(),
+                        d.getSyncAggregateBitlist(),
+                        d.getIndex(),
+                        d.getSubIndex()))
+                .collect(Collectors.toList()));
+    }
+
+    public Optional<ValidatorsData> getValidatorsBySlot(UInt64 slot, List<Integer> allValidators) {
         var value = keyValueStore.get(slot.toString());
         if (value.isEmpty()) {
             return Optional.empty();
@@ -172,9 +194,18 @@ public class NetworkDataProvider {
                         }
                     }
                 });
-        var validatorsIndicies = syncCommitteeMessageData.stream()
-                .map(SyncCommitteeMessageData::getIndex)
-                .collect(Collectors.toList());
+        List<Integer> validatorsIndicies = new ArrayList<>();
+        if (allValidators != null) {
+            for (var bitIndex = 0; bitIndex < finalBitList.size(); bitIndex++) {
+                if (finalBitList.get(bitIndex) == 1) {
+                    validatorsIndicies.add(allValidators.get(bitIndex));
+                }
+            }
+        } else {
+            validatorsIndicies = syncCommitteeMessageData.stream()
+                    .map(SyncCommitteeMessageData::getIndex)
+                    .collect(Collectors.toList());
+        }
         var count = (int) finalBitList.stream().filter(b -> b == 1).count();
 
         return Optional.of(new ValidatorsData(slot.intValue(),
@@ -190,7 +221,8 @@ public class NetworkDataProvider {
         var bitsSize = syncCommitteeMessageDataList.get(0).getSyncAggregateBitlist().size();
 
         List<Integer> bitsByIndexCount = new ArrayList<>();
-        List<Set<Integer>> bitlistsForBit = new ArrayList<>();;
+        List<Set<Integer>> bitlistsForBit = new ArrayList<>();
+        ;
         for (var bitIndex = 0; bitIndex < bitsSize; bitIndex++) {
             int c = 0;
             Set<Integer> set = new HashSet<>();
@@ -239,8 +271,10 @@ public class NetworkDataProvider {
             int maxBits = -1;
             for (var activeBitlistNumber : activeBitlistsNumbers) {
                 if (uniqueBitsCount.get(activeBitlistNumber) > maxUniqueBits
-                        || (uniqueBitsCount.get(activeBitlistNumber) == maxUniqueBits && bitsCount.get(activeBitlistNumber) == maxBits)) {
+                        || (uniqueBitsCount.get(activeBitlistNumber) == maxUniqueBits && bitsCount.get(activeBitlistNumber) > maxBits)) {
                     leftOne = activeBitlistNumber;
+                    maxUniqueBits = uniqueBitsCount.get(activeBitlistNumber);
+                    maxBits = bitsCount.get(activeBitlistNumber);
                 }
             }
             for (var activeBitlistNumber : activeBitlistsNumbers) {

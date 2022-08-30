@@ -64,6 +64,7 @@ import tech.pegasys.teku.beaconrestapi.handlers.v1.beacon.PostVoluntaryExit;
 import tech.pegasys.teku.beaconrestapi.handlers.v1.config.GetDepositContract;
 import tech.pegasys.teku.beaconrestapi.handlers.v1.config.GetForkSchedule;
 import tech.pegasys.teku.beaconrestapi.handlers.v1.config.GetSpec;
+import tech.pegasys.teku.beaconrestapi.handlers.v1.crawler.GetSyncMessagesBySlot;
 import tech.pegasys.teku.beaconrestapi.handlers.v1.crawler.GetValidatorsBySlot;
 import tech.pegasys.teku.beaconrestapi.handlers.v1.debug.GetChainHeadsV1;
 import tech.pegasys.teku.beaconrestapi.handlers.v1.events.GetEvents;
@@ -280,6 +281,7 @@ public class JsonTypeDefinitionBeaconRestApi implements BeaconRestApi {
         .endpoint(new GetValidatorInclusion(dataProvider))
         // Crawler
         .endpoint(new GetValidatorsBySlot(dataProvider))
+        .endpoint(new GetSyncMessagesBySlot(dataProvider))
         .build();
   }
 }
