@@ -111,6 +111,7 @@ public class GetValidatorsBySlot extends MigratingEndpointAdapter {
             .stream()
             .map(UInt64::intValue)
             .collect(Collectors.toList());
+    LOG.info("All validators: {}", allValidators);
     var validatorsBySlot = network.getValidatorsBySlot(request.getPathParameter(SLOT_PARAMETER), allValidators);
     LOG.info("Found validators list: {}", validatorsBySlot);
     if (validatorsBySlot.isEmpty()) {
@@ -127,7 +128,7 @@ public class GetValidatorsBySlot extends MigratingEndpointAdapter {
                   .withField("slot", INTEGER_TYPE, v -> v.slot)
                   .withField("beacon_root", STRING_TYPE, v -> v.beaconRoot)
                   .withField("signature", STRING_TYPE, v -> v.signature)
-                  .withField("bitlist", listOf(INTEGER_TYPE), v -> v.bitlist)
+                  .withField("bitlist", STRING_TYPE, v -> v.bitlist)
                   .withField("validators_indicies", listOf(INTEGER_TYPE), v -> v.validatorsIndicies)
                   .withField("count", INTEGER_TYPE, v -> v.count)
                   .build();

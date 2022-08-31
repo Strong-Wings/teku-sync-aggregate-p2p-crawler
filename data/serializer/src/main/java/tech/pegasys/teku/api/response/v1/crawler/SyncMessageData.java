@@ -17,21 +17,21 @@ public class SyncMessageData {
     public final String signature;
 
     @JsonProperty("bitlist")
-    public final List<Integer> bitlist;
+    public final String bitlist;
 
     @JsonProperty("validator_index")
     public final Integer index;
 
     @JsonProperty("sub_committee_index")
-    public final Integer subIndex;
+    public final String subIndex;
 
     @JsonCreator
     public SyncMessageData(@JsonProperty("slot") final int slot,
                            @JsonProperty("beacon_root") final String beaconRoot,
                            @JsonProperty("signature") final String signature,
-                           @JsonProperty("bitlist") final List<Integer> bitlist,
+                           @JsonProperty("bitlist") final String bitlist,
                            @JsonProperty("validator_index") final Integer index,
-                           @JsonProperty("sub_committee_index") final Integer subIndex) {
+                           @JsonProperty("sub_committee_index") final String subIndex) {
         this.slot = slot;
         this.beaconRoot = beaconRoot;
         this.signature = signature;

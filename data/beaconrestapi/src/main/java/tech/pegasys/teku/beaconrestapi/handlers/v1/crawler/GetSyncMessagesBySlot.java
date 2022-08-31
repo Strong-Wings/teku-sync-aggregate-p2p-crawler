@@ -45,7 +45,7 @@ import static tech.pegasys.teku.infrastructure.http.RestApiConstants.RES_OK;
 import static tech.pegasys.teku.infrastructure.http.RestApiConstants.SLOT;
 import static tech.pegasys.teku.infrastructure.http.RestApiConstants.SLOT_PATH_DESCRIPTION;
 import static tech.pegasys.teku.infrastructure.http.RestApiConstants.TAG_NODE;
-import static tech.pegasys.teku.infrastructure.json.types.CoreTypes.INTEGER_TYPE;
+import static tech.pegasys.teku.infrastructure.json.types.CoreTypes.RAW_INTEGER_TYPE;
 import static tech.pegasys.teku.infrastructure.json.types.CoreTypes.STRING_TYPE;
 import static tech.pegasys.teku.infrastructure.json.types.SerializableTypeDefinition.listOf;
 
@@ -108,12 +108,12 @@ public class GetSyncMessagesBySlot extends MigratingEndpointAdapter {
   private static final SerializableTypeDefinition<SyncMessageData> SYNC_MESSAGE_DATA_TYPE =
           SerializableTypeDefinition.<SyncMessageData>object()
                   .name("SyncMessageData")
-                  .withField("slot", INTEGER_TYPE, v -> v.slot)
+                  .withField("slot", RAW_INTEGER_TYPE, v -> v.slot)
                   .withField("beacon_root", STRING_TYPE, v -> v.beaconRoot)
                   .withField("signature", STRING_TYPE, v -> v.signature)
-                  .withField("bitlist", listOf(INTEGER_TYPE), v -> v.bitlist)
-                  .withField("validator_index", INTEGER_TYPE, v -> v.index)
-                  .withField("sub_committee_index", INTEGER_TYPE, v -> v.subIndex)
+                  .withField("bitlist", STRING_TYPE, v -> v.bitlist)
+                  .withField("validator_index", RAW_INTEGER_TYPE, v -> v.index)
+                  .withField("sub_committee_index", STRING_TYPE, v -> v.subIndex)
                   .build();
 
   private static final SerializableTypeDefinition<SyncMessagesWithData> SYNC_MESSAGE_RESPONSE_TYPE =

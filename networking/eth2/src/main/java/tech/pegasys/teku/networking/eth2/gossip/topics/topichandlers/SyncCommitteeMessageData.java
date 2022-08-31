@@ -12,6 +12,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static tech.pegasys.teku.spec.constants.NetworkConstants.SYNC_COMMITTEE_SUBNET_COUNT;
+
 public class SyncCommitteeMessageData {
 
     private String beaconHeaderRoot;
@@ -51,7 +53,7 @@ public class SyncCommitteeMessageData {
         }
         if (syncAggregateBitlist != null) {
             this.syncAggregateBitlist = new ArrayList<>();
-            for (int i = 0; i < syncAggregateBitlist.size() * 4; i++) {
+            for (int i = 0; i < syncAggregateBitlist.size() * SYNC_COMMITTEE_SUBNET_COUNT; i++) {
                 this.syncAggregateBitlist.add(0);
             }
             for (int i = 0; i < syncAggregateBitlist.size(); i++) {

@@ -14,17 +14,18 @@
 package tech.pegasys.teku.api;
 
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.tuweni.bytes.Bytes;
-import tech.pegasys.teku.api.migrated.StateValidatorData;
+import org.identityconnectors.common.CollectionUtil;
 import tech.pegasys.teku.api.response.v1.crawler.SyncMessageData;
 import tech.pegasys.teku.api.response.v1.crawler.ValidatorsData;
 import tech.pegasys.teku.api.response.v1.node.Direction;
@@ -41,6 +42,8 @@ import tech.pegasys.teku.networking.p2p.peer.NodeId;
 import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.metadata.MetadataMessage;
 import tech.pegasys.teku.storage.store.FileKeyValueStoreFactory;
 import tech.pegasys.teku.storage.store.KeyValueStore;
+
+import static tech.pegasys.teku.spec.constants.NetworkConstants.SYNC_COMMITTEE_SUBNET_COUNT;
 
 public class NetworkDataProvider {
 
@@ -148,9 +151,11 @@ public class NetworkDataProvider {
                 .map(d -> new SyncMessageData(d.getBeaconHeaderSlot(),
                         d.getBeaconHeaderRoot(),
                         d.getSyncAggregateSignature(),
-                        d.getSyncAggregateBitlist(),
+                        d.getSyncAggregateBitlist() != null
+                                ? d.getSyncAggregateBitlist().stream().map(String::valueOf).collect(Collectors.joining())
+                                : null,
                         d.getIndex(),
-                        d.getSubIndex()))
+                        Optional.ofNullable(d.getSubIndex()).map(String::valueOf).orElse(null)))
                 .collect(Collectors.toList()));
     }
 
@@ -180,22 +185,9 @@ public class NetworkDataProvider {
                         .map(s -> BLSSignature.fromBytesCompressed(Bytes.fromHexString(s)))
                         .collect(Collectors.toList())
         ).toString();
-        List<Integer> finalBitList = new ArrayList<>();
-        selectedSyncCommitteeData.stream()
-                .map(SyncCommitteeMessageData::getSyncAggregateBitlist)
-                .filter(Objects::nonNull)
-                .forEach(bl -> {
-                    if (finalBitList.isEmpty()) {
-                        finalBitList.addAll(bl);
-                    }
-                    for (int i = 0; i < bl.size(); i++) {
-                        if (bl.get(i) == 1) {
-                            finalBitList.set(i, 1);
-                        }
-                    }
-                });
+        var finalBitList = createFinalBitlist(selectedSyncCommitteeData);
         List<Integer> validatorsIndicies = new ArrayList<>();
-        if (allValidators != null) {
+        if (!CollectionUtil.isEmpty(allValidators)) {
             for (var bitIndex = 0; bitIndex < finalBitList.size(); bitIndex++) {
                 if (finalBitList.get(bitIndex) == 1) {
                     validatorsIndicies.add(allValidators.get(bitIndex));
@@ -211,90 +203,70 @@ public class NetworkDataProvider {
         return Optional.of(new ValidatorsData(slot.intValue(),
                 beaconRoot,
                 signature,
-                finalBitList,
+                finalBitList.stream().map(String::valueOf).collect(Collectors.joining()),
                 validatorsIndicies,
                 count));
     }
 
-    private static List<SyncCommitteeMessageData> selectBitlistsWithoutIntersections
+    public static List<SyncCommitteeMessageData> selectBitlistsWithoutIntersections
             (List<SyncCommitteeMessageData> syncCommitteeMessageDataList) {
-        var bitsSize = syncCommitteeMessageDataList.get(0).getSyncAggregateBitlist().size();
+        List<SyncCommitteeMessageData> finalSyncCommitteeData = new ArrayList<>();
 
-        List<Integer> bitsByIndexCount = new ArrayList<>();
-        List<Set<Integer>> bitlistsForBit = new ArrayList<>();
-        ;
-        for (var bitIndex = 0; bitIndex < bitsSize; bitIndex++) {
-            int c = 0;
-            Set<Integer> set = new HashSet<>();
-            for (var bitlistNumber = 0; bitlistNumber < syncCommitteeMessageDataList.size(); bitlistNumber++) {
-                var bitlist = syncCommitteeMessageDataList.get(bitlistNumber).getSyncAggregateBitlist();
-                c += bitlist.get(bitIndex);
-                if (bitlist.get(bitIndex) == 1) {
-                    set.add(bitlistNumber);
-                }
-            }
-            bitsByIndexCount.add(c);
-            bitlistsForBit.add(set);
-        }
+        for (var subIndex = 0; subIndex < SYNC_COMMITTEE_SUBNET_COUNT; subIndex++) {
+            final int finalSubIndex = subIndex;
+            var bitlists = syncCommitteeMessageDataList.stream()
+                    .filter(s -> s.getSubIndex() ==  finalSubIndex)
+                    .map(SyncCommitteeMessageData::getSyncAggregateBitlist)
+                    .collect(Collectors.toList());
 
-        List<Integer> bitsCount = new ArrayList<>();
-        List<Integer> uniqueBitsCount = new ArrayList<>();
-        for (var syncCommitteeMessageData : syncCommitteeMessageDataList) {
-            var bitList = syncCommitteeMessageData.getSyncAggregateBitlist();
-            var c1 = 0;
-            var c2 = 0;
-            for (var bitIndex = 0; bitIndex < bitsSize; bitIndex++) {
-                if (bitList.get(bitIndex) == 1) {
-                    c1 += 1;
-                    if (bitsByIndexCount.get(bitIndex) == 1) {
-                        c2 += 1;
+            var bitlistsWithOneBit = bitlists.stream()
+                    .filter(bl -> Collections.frequency(bl, 1) == 1)
+                    .collect(Collectors.toMap(bl -> bl.indexOf(1), Function.identity(), (b1, b2) -> b1));
+            var otherBitlists = bitlists.stream()
+                    .filter(bl -> Collections.frequency(bl, 1) > 1)
+                    .collect(Collectors.toList());
+
+            List<List<Integer>> selectedBitlists = new ArrayList<>();
+            var maxCount = -1;
+            for (var mainBitlist : otherBitlists) {
+                List<List<Integer>> currentSelectedBitlists = new ArrayList<>();
+                currentSelectedBitlists.add(mainBitlist);
+                var tmpMainBitlist = new ArrayList<>(mainBitlist);
+                for (var bitlistWithOneBitEntry : bitlistsWithOneBit.entrySet()) {
+                    if (tmpMainBitlist.get(bitlistWithOneBitEntry.getKey()) == 0) {
+                        tmpMainBitlist.set(bitlistWithOneBitEntry.getKey(), 1);
+                        currentSelectedBitlists.add(bitlistWithOneBitEntry.getValue());
                     }
                 }
+                var bitsCount = Collections.frequency(tmpMainBitlist, 1);
+                if (bitsCount > maxCount) {
+                    maxCount = bitsCount;
+                    selectedBitlists.clear();
+                    selectedBitlists.addAll(currentSelectedBitlists);
+                }
             }
-            bitsCount.add(c1);
-            uniqueBitsCount.add(c2);
+            finalSyncCommitteeData.addAll(syncCommitteeMessageDataList.stream()
+                    .filter(s -> selectedBitlists.contains(s.getSyncAggregateBitlist()))
+                    .collect(Collectors.toList()));
         }
+        return finalSyncCommitteeData;
+    }
 
-        List<Boolean> removedBitlists = syncCommitteeMessageDataList.stream()
+    public static List<Integer> createFinalBitlist(List<SyncCommitteeMessageData> selectedSyncCommitteeData) {
+        List<Integer> finalBitList = new ArrayList<>();
+        selectedSyncCommitteeData.stream()
                 .map(SyncCommitteeMessageData::getSyncAggregateBitlist)
-                .map(b -> false)
-                .collect(Collectors.toList());
-        for (var bitIndex = 0; bitIndex < bitsSize; bitIndex++) {
-            Set<Integer> activeBitlistsNumbers = new HashSet<>();
-            for (var bitlistNumber : bitlistsForBit.get(bitIndex)) {
-                if (!removedBitlists.get(bitlistNumber)) {
-                    activeBitlistsNumbers.add(bitlistNumber);
-                }
-            }
-            int leftOne = -1;
-            int maxUniqueBits = -1;
-            int maxBits = -1;
-            for (var activeBitlistNumber : activeBitlistsNumbers) {
-                if (uniqueBitsCount.get(activeBitlistNumber) > maxUniqueBits
-                        || (uniqueBitsCount.get(activeBitlistNumber) == maxUniqueBits && bitsCount.get(activeBitlistNumber) > maxBits)) {
-                    leftOne = activeBitlistNumber;
-                    maxUniqueBits = uniqueBitsCount.get(activeBitlistNumber);
-                    maxBits = bitsCount.get(activeBitlistNumber);
-                }
-            }
-            for (var activeBitlistNumber : activeBitlistsNumbers) {
-                if (activeBitlistNumber != leftOne) {
-                    removedBitlists.set(activeBitlistNumber, true);
-                }
-            }
-        }
-
-        Set<Integer> selectedBitlistsNumbers = new HashSet<>();
-        for (var bitlistNumber = 0; bitlistNumber < removedBitlists.size(); bitlistNumber++) {
-            if (!removedBitlists.get(bitlistNumber)) {
-                selectedBitlistsNumbers.add(bitlistNumber);
-            }
-        }
-
-        List<SyncCommitteeMessageData> selectedSyncCommitteeMessageDataList = new ArrayList<>();
-        for (var selectedBitlistNumber : selectedBitlistsNumbers) {
-            selectedSyncCommitteeMessageDataList.add(syncCommitteeMessageDataList.get(selectedBitlistNumber));
-        }
-        return selectedSyncCommitteeMessageDataList;
+                .filter(Objects::nonNull)
+                .forEach(bl -> {
+                    if (finalBitList.isEmpty()) {
+                        finalBitList.addAll(bl);
+                    }
+                    for (int i = 0; i < bl.size(); i++) {
+                        if (bl.get(i) == 1) {
+                            finalBitList.set(i, 1);
+                        }
+                    }
+                });
+        return finalBitList;
     }
 }
